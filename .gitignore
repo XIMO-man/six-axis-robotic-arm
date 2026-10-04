@@ -1,0 +1,14 @@
+# ROS catkin 编译产物
+build/
+install/
+log/
+devel/
+
+# vscode 配置（可选，看你是否要提交编辑器配置）
+.vscode/
+
+# 其他临时文件
+*.swp
+*.swo
+*.pyc
+__pycache__/

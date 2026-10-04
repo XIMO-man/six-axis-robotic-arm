@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<robot name="six_axis_arm">
+  <group name="arm"><chain base_link="base_link" tip_link="grasp_center"/></group>
+  <group name="gripper"><joint name="finger_joint"/><joint name="right_finger_joint"/></group>
+  <end_effector name="gripper" parent_link="grasp_center" group="gripper" parent_group="arm"/>
+  <group_state name="home" group="arm">
+    <joint name="joint_1" value="0"/><joint name="joint_2" value="-0.45"/>
+    <joint name="joint_3" value="0.9"/><joint name="joint_4" value="0"/>
+    <joint name="joint_5" value="0.45"/><joint name="joint_6" value="0"/>
+  </group_state>
+  <group_state name="open" group="gripper"><joint name="finger_joint" value="0.04"/></group_state>
+  <group_state name="closed" group="gripper"><joint name="finger_joint" value="0"/></group_state>
+  <disable_collisions link1="base_link" link2="shoulder_link" reason="Adjacent"/>
+  <disable_collisions link1="shoulder_link" link2="upper_arm_link" reason="Adjacent"/>
+  <disable_collisions link1="upper_arm_link" link2="forearm_link" reason="Adjacent"/>
+  <disable_collisions link1="forearm_link" link2="wrist_1_link" reason="Adjacent"/>
+  <disable_collisions link1="wrist_1_link" link2="wrist_2_link" reason="Adjacent"/>
+  <disable_collisions link1="wrist_2_link" link2="wrist_3_link" reason="Adjacent"/>
+  <disable_collisions link1="wrist_3_link" link2="gripper_base" reason="Adjacent"/>
+  <disable_collisions link1="gripper_base" link2="left_finger" reason="Adjacent"/>
+  <disable_collisions link1="gripper_base" link2="right_finger" reason="Adjacent"/>
+  <!-- The inner finger faces touch at zero opening. -->
+  <disable_collisions link1="left_finger" link2="right_finger" reason="Default"/>
+</robot>

@@ -1,0 +1,192 @@
+<?xml version="1.0"?>
+<robot name="six_axis_arm" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:arg name="sim" default="false"/>
+  <xacro:arg name="controllers_file" default=""/>
+
+  <xacro:property name="upper_length" value="0.30"/>
+  <xacro:property name="fore_length" value="0.25"/>
+  <xacro:property name="finger_travel" value="0.04"/>
+
+  <material name="orange"><color rgba="0.95 0.42 0.08 1"/></material>
+  <material name="gray"><color rgba="0.25 0.28 0.32 1"/></material>
+
+  <!-- 盒形连杆：参考坐标系位于底面中心，沿局部 Z 轴延伸。 -->
+  <xacro:macro name="box_link" params="name x y z mass color">
+    <link name="${name}">
+      <visual>
+        <origin xyz="0 0 ${z/2}"/>
+        <geometry><box size="${x} ${y} ${z}"/></geometry>
+        <material name="${color}"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 ${z/2}"/>
+        <geometry><box size="${x} ${y} ${z}"/></geometry>
+      </collision>
+      <inertial>
+        <origin xyz="0 0 ${z/2}"/>
+        <mass value="${mass}"/>
+        <inertia
+          ixx="${mass*(y*y+z*z)/12}"
+          iyy="${mass*(x*x+z*z)/12}"
+          izz="${mass*(x*x+y*y)/12}"
+          ixy="0" ixz="0" iyz="0"/>
+      </inertial>
+    </link>
+  </xacro:macro>
+
+  <xacro:macro name="rotation"
+               params="name parent child z axis low high effort speed">
+    <joint name="${name}" type="revolute">
+      <parent link="${parent}"/>
+      <child link="${child}"/>
+      <origin xyz="0 0 ${z}" rpy="0 0 0"/>
+      <axis xyz="${axis}"/>
+      <limit lower="${low}" upper="${high}"
+             effort="${effort}" velocity="${speed}"/>
+      <dynamics damping="0.1" friction="0.02"/>
+    </joint>
+  </xacro:macro>
+
+  <!-- 固定安装的机械臂。 -->
+  <link name="world"/>
+  <joint name="base_fixed" type="fixed">
+    <parent link="world"/>
+    <child link="base_link"/>
+  </joint>
+
+  <xacro:box_link name="base_link"
+    x="0.24" y="0.24" z="0.12" mass="5" color="gray"/>
+  <xacro:box_link name="shoulder_link"
+    x="0.12" y="0.12" z="0.14" mass="2" color="gray"/>
+  <xacro:box_link name="upper_arm_link"
+    x="0.08" y="0.08" z="${upper_length}" mass="2" color="orange"/>
+  <xacro:box_link name="forearm_link"
+    x="0.065" y="0.065" z="${fore_length}" mass="1.5" color="orange"/>
+  <xacro:box_link name="wrist_1_link"
+    x="0.055" y="0.055" z="0.08" mass="0.4" color="gray"/>
+  <xacro:box_link name="wrist_2_link"
+    x="0.05" y="0.05" z="0.08" mass="0.3" color="orange"/>
+  <xacro:box_link name="wrist_3_link"
+    x="0.045" y="0.045" z="0.06" mass="0.2" color="gray"/>
+
+  <!-- 六个旋转关节：Z-Y-Y-Z-Y-Z，轴均以关节局部坐标表示。 -->
+  <xacro:rotation name="joint_1"
+    parent="base_link" child="shoulder_link"
+    z="0.12" axis="0 0 1"
+    low="${-pi}" high="${pi}" effort="100" speed="1.5"/>
+
+  <xacro:rotation name="joint_2"
+    parent="shoulder_link" child="upper_arm_link"
+    z="0.14" axis="0 1 0"
+    low="${-pi/2}" high="${pi/2}" effort="100" speed="1.5"/>
+
+  <xacro:rotation name="joint_3"
+    parent="upper_arm_link" child="forearm_link"
+    z="${upper_length}" axis="0 1 0"
+    low="${-5*pi/6}" high="${5*pi/6}" effort="60" speed="1.5"/>
+
+  <xacro:rotation name="joint_4"
+    parent="forearm_link" child="wrist_1_link"
+    z="${fore_length}" axis="0 0 1"
+    low="${-pi}" high="${pi}" effort="20" speed="2"/>
+
+  <xacro:rotation name="joint_5"
+    parent="wrist_1_link" child="wrist_2_link"
+    z="0.08" axis="0 1 0"
+    low="${-2*pi/3}" high="${2*pi/3}" effort="20" speed="2"/>
+
+  <xacro:rotation name="joint_6"
+    parent="wrist_2_link" child="wrist_3_link"
+    z="0.08" axis="0 0 1"
+    low="${-pi}" high="${pi}" effort="10" speed="2"/>
+
+  <!-- 末端安装法兰坐标系。 -->
+  <link name="tool0"/>
+  <joint name="tool_fixed" type="fixed">
+    <parent link="wrist_3_link"/>
+    <child link="tool0"/>
+    <origin xyz="0 0 0.06"/>
+  </joint>
+
+  <!-- 夹爪掌部：120 × 60 × 40 mm。 -->
+  <xacro:box_link name="gripper_base"
+    x="0.12" y="0.06" z="0.04" mass="0.5" color="gray"/>
+  <joint name="gripper_fixed" type="fixed">
+    <parent link="tool0"/>
+    <child link="gripper_base"/>
+  </joint>
+
+  <!-- 手指：厚 12 mm、宽 25 mm、长 80 mm。 -->
+  <xacro:box_link name="left_finger"
+    x="0.012" y="0.025" z="0.08" mass="0.08" color="orange"/>
+  <xacro:box_link name="right_finger"
+    x="0.012" y="0.025" z="0.08" mass="0.08" color="orange"/>
+
+  <!-- q=0 时内侧面相接；开口宽度 = 2q。 -->
+  <joint name="finger_joint" type="prismatic">
+    <parent link="gripper_base"/>
+    <child link="left_finger"/>
+    <origin xyz="0.006 0 0.04"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="0" upper="${finger_travel}"
+           effort="30" velocity="0.05"/>
+    <dynamics damping="1.0" friction="0.1"/>
+  </joint>
+
+  <!-- 两侧使用相同局部 X 轴，右指负位移实现对称开合。 -->
+  <joint name="right_finger_joint" type="prismatic">
+    <parent link="gripper_base"/>
+    <child link="right_finger"/>
+    <origin xyz="-0.006 0 0.04"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="${-finger_travel}" upper="0"
+           effort="30" velocity="0.05"/>
+    <xacro:unless value="$(arg sim)">
+      <mimic joint="finger_joint" multiplier="-1" offset="0"/>
+    </xacro:unless>
+    <dynamics damping="1.0" friction="0.1"/>
+  </joint>
+
+  <!-- 抓取参考点：位于两指之间、距指根 60 mm。 -->
+  <link name="grasp_center"/>
+  <joint name="grasp_center_fixed" type="fixed">
+    <parent link="gripper_base"/>
+    <child link="grasp_center"/>
+    <origin xyz="0 0 0.10"/>
+  </joint>
+
+  <xacro:if value="$(arg sim)">
+    <xacro:macro name="controlled_joint" params="name initial interface:=position">
+      <joint name="${name}">
+        <command_interface name="${interface}"/>
+        <state_interface name="position"><param name="initial_value">${initial}</param></state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+    </xacro:macro>
+    <ros2_control name="GazeboSimSystem" type="system">
+      <hardware><plugin>gz_ros2_control/GazeboSimSystem</plugin></hardware>
+      <xacro:controlled_joint name="joint_1" initial="0.0"/>
+      <xacro:controlled_joint name="joint_2" initial="-0.45"/>
+      <xacro:controlled_joint name="joint_3" initial="0.9"/>
+      <xacro:controlled_joint name="joint_4" initial="0.0"/>
+      <xacro:controlled_joint name="joint_5" initial="0.45"/>
+      <xacro:controlled_joint name="joint_6" initial="0.0"/>
+      <xacro:controlled_joint name="finger_joint" initial="0.0" interface="effort"/>
+      <xacro:controlled_joint name="right_finger_joint" initial="0.0" interface="effort"/>
+    </ros2_control>
+    <gazebo>
+      <plugin filename="libgz_ros2_control-system.so" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+        <parameters>$(arg controllers_file)</parameters>
+      </plugin>
+    </gazebo>
+    <gazebo reference="left_finger"><mu1>2.0</mu1><mu2>2.0</mu2></gazebo>
+    <gazebo reference="right_finger">
+      <mu1>2.0</mu1><mu2>2.0</mu2>
+      <sensor name="right_contact" type="contact">
+        <always_on>true</always_on><update_rate>50</update_rate>
+        <topic>/gripper/right_contacts</topic>
+        <contact><collision>right_finger_collision</collision></contact>
+      </sensor>
+    </gazebo>
+  </xacro:if>
+</robot>
